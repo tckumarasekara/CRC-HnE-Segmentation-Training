@@ -30,9 +30,8 @@ deterministically on three different architectures: A basic U-Net, a context U-N
 
 
 
-* Free software: MIT
+* Free software: MIT License
 * Documentation: https://seg-training.readthedocs.io.
-
 
 
 Features
@@ -44,6 +43,15 @@ Features
     * Context U-Net
     * Spatial Transformer U-Net
 
+
+Installation
+------------
+* Clone the repository and navigate to the project directory.
+* Create the conda environment using the provided environment_new.yml file:
+.. code-block:: bash
+    conda env create -f environment_new.yml
+
+
 Credits
 -------
 
@@ -53,3 +61,5 @@ This package was created with `mlf-core`_ using Cookiecutter_.
 .. context U-Net: https://link.springer.com/chapter/10.1007/978-3-319-75238-9_25
 .. _mlf-core: https://mlf-core.readthedocs.io/en/latest/
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
+
+This repository was originally written by Dominik Molitor.

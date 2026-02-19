@@ -5,6 +5,7 @@ import sys
 
 def __getattr__(name):
     return getattr(sys.modules[__name__], name)
+
 class Unet(UnetSuper):
     """Unet
 
@@ -12,7 +13,7 @@ class Unet(UnetSuper):
     original paper: https://arxiv.org/pdf/1505.04597
     """
     def __init__(self, hparams, input_channels, is_deconv=True, is_batchnorm=True, on_gpu=False, **kwargs):
-        super().__init__( hparams=hparams, **kwargs)
+        super().__init__(hparams=hparams, **kwargs)
         self.in_channels = input_channels
         self.is_deconv = is_deconv
         self.is_batchnorm = is_batchnorm
@@ -350,6 +351,7 @@ class SkipNet(UnetSuper):
             self.up_fwd1.cuda()
             self.up_fwd2.cuda()
         self.apply(weights_init)
+
     def forward(self, inputs):
         maxpool = nn.MaxPool2d(kernel_size=2)
         ### Start Encoder

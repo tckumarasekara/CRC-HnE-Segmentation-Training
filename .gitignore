@@ -128,6 +128,18 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Data
+histology_segmentation_training/data/OME-TIFFs/
+histology_segmentation_training/data/download/OME-TIFFs.zip
+histology_segmentation_training/data/__MACOSX/
+histology_segmentation_training/data/download/img1.zip
+histology_segmentation_training/data/download/img2.zip
+histology_segmentation_training/data/download/img_labels.zip
+
+# outputs
+mlruns/
+out/
+
 # Jetbrains IDE
 mlruns/0/*
 .idea/

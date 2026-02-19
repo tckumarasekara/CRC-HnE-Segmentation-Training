@@ -27,22 +27,34 @@ from torch.utils.data import Dataset
 
 class ConicData(Dataset):
     workdir = os.getcwd()
+
     def __init__(self, ids: list, download: bool,
                  from_source: bool = False, from_ome_tiff: bool = True, apply_trans=False):
         super(ConicData, self).__init__()
-        if len(glob.glob(self.workdir + "/histology_segmentation_training/data/OME-TIFFs/*")) < 2:
-            self.from_source()
+
         self.ids = ids
         self.imgs = []
         self.labels = []
-        self.img_dir = self.workdir + "/histology_segmentation_training/data/OME-TIFFs/"
-        self.np_dir = self.workdir + "/histology_segmentation_training/data/patches/"
+        self.download_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/download/"
+        self.img_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/OME-TIFFs/"
+        self.np_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/"
         self.names = pd.read_csv(self.np_dir + "patch_info.csv")
-        self.count = pd.read_csv(self.np_dir + "counts.csv")
-        if from_source:
-            self.from_source()
+        self.apply_trans = apply_trans
+        #self.count = pd.read_csv(self.np_dir + "counts.csv")
+
+        if len(glob.glob(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/OME-TIFFs/*")) < 2:
+            if download:
+                self.from_zenodo()
+            elif from_source:
+                try:
+                    self.from_source()
+                except:
+                    print("Could not download from source. Downloading from zenodo instead.")
+                    self.from_zenodo()
+
         if not self._check_exists:
             raise RuntimeError("Dataset not found!")
+
         if from_ome_tiff:
             for idx in self.ids:
                 name = self.names.iloc[idx, 0]
@@ -50,6 +62,10 @@ class ConicData(Dataset):
                 img_raw = tiff.imread(img_path)
                 img = np.array(img_raw)[0:3, :, :]
                 label = np.array(img_raw)[3, :, :]
+                for num in np.unique(label):
+                    if num > 6:
+                        print(f"Warning: Found unexpected label value {num} in image {name}")
+                        continue
                 self.imgs.append(img)
                 self.labels.append(label)
         else:
@@ -58,10 +74,11 @@ class ConicData(Dataset):
             for pair in zip(imgs, labels):
                 self.imgs.append(torch.tensor(pair[0]))
                 self.labels.append(torch.tensor(pair[1]))
-        self.apply_trans = apply_trans
+
 
     def __len__(self):
         return len(self.imgs)
+
 
     def apply_transformation(self, img, label):
         img = np.transpose(img, axes=[1, 2, 0])
@@ -78,9 +95,9 @@ class ConicData(Dataset):
         label = np.clip(np.rint(label), 0, 6)
         return img, label
 
+
     def __getitem__(self, index):
         img, target = self.imgs[index], self.labels[index]
-        print(target.shape)
         pair = (img, target)
         if self.apply_trans is not None:
             augmented = self.apply_transformation(img, target)
@@ -91,15 +108,43 @@ class ConicData(Dataset):
 
         return pair
 
+
+    def from_zenodo(self):
+        """Method for downloading the already patched and masked ome.tiff files from zenodo"""
+
+        url = "https://zenodo.org/records/7508237/files/OME-TIFFs.zip?download=1"
+        zip_path = os.path.join(self.download_dir, "OME-TIFFs.zip")
+        print("Starting download...")
+
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get("Content-Length", 0))
+            downloaded = 0
+
+            with open(zip_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        done = int(50 * downloaded / total_size)
+                        print(f"\r[{'=' * done}{' ' * (50-done)}] {downloaded/total_size:.2%}", end="")
+
+        print("\nDownload completed!")
+
+        self._unzip_files(zip_path)
+        os.remove(zip_path)
+        print("Files unzipped and zip file removed.")
+
+
     def from_source(self):
         """Method for downloading, unzipping, patching and creating segmentation masked ome.tiff"""
         self._download_files()
-        for zip_file in glob.glob(self.workdir + "/histology_segmentation_training/data/download/img*"):
+        for zip_file in glob.glob(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/download/img*"):
             self._unzip_files(zip_file)
             os.remove(zip_file)
-        for file in glob.glob(self.workdir + "/histology_segmentation_training/data/Lizard_I*/*"):
+        for file in glob.glob(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/Lizard_I*/*"):
             file_name = file.split("/")[-1]
-            shutil.copyfile(file, os.path.join(self.workdir + "/histology_segmentation_training//data/images/", file_name))
+            shutil.copyfile(file, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/images/", file_name))
             os.remove(file)
         self._create_patches()
         self._numpy_to_ome_tiff()
@@ -107,14 +152,15 @@ class ConicData(Dataset):
 
     @staticmethod
     def _check_exists():
-        if len(glob.glob(os.getcwd() + "histology_segmentation_training/data/patches/*")) > 0:
+        if len(glob.glob(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/*")) > 0:
             return True
         else:
             return False
 
+
     @staticmethod
     def _download_files():
-        download = "../data/download/"
+        download = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/download/"
         """Method to download the raw Lizard Dataset"""
         image_region1 = requests.get("https://warwick.ac.uk/fac/cross_fac/tia/data/lizard/lizard_images1.zip")
         print("Image region 1 has been downloaded")
@@ -126,13 +172,15 @@ class ConicData(Dataset):
         open(download + "img2.zip", "wb").write(image_region2.content)
         open(download + "img_labels.zip", "wb").write(labels.content)
 
+
     @staticmethod
     def _unzip_files(zip_file):
-        print(zip_file)
+        print(f"Unzipping file: {zip_file}")
         """General Method to unzip folders"""
-        with ZipFile(zip_file) as zfile:
-            zfile.extractall("../data/")
+        with ZipFile(zip_file, "r") as zfile:
+            zfile.extractall(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/")
             zfile.close()
+
 
     @staticmethod
     def _create_patches(step_size: int = 256):
@@ -144,9 +192,9 @@ class ConicData(Dataset):
         win_size = 256  # should keep this the same!
         step_size = step_size  # decrease this to have a larger overlap between patches
         extract_type = "valid"
-        img_dir = "../data/images/"
-        ann_dir = "../data/Lizard_Labels/Labels/"
-        out_dir = "../data/patches/"
+        img_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/images/"
+        ann_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/Lizard_Labels/Labels/"
+        out_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/"
 
         rm_n_mkdir(out_dir)
 
@@ -166,17 +214,19 @@ class ConicData(Dataset):
         class_map_list = []
         nuclei_counts_list = []
         patch_names_list = []
+
         for file_idx, file_path in enumerate(file_path_list):
             basename = pathlib.Path(file_path).stem
 
             img = cv2.imread(img_dir + basename + ".png")
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            ##
+
             ann_load = sio.loadmat(ann_dir + basename + ".mat")
             ann_inst = ann_load["inst_map"]
             inst_class = np.squeeze(ann_load["class"]).tolist()
             inst_id = np.squeeze(ann_load["id"]).tolist()
             ann_class = np.full(ann_inst.shape[:2], 0, dtype=np.uint8)
+
             for val in inst_id:
                 ann_inst_tmp = ann_inst == val
                 idx_tmp = inst_id.index(val)
@@ -199,6 +249,7 @@ class ConicData(Dataset):
                 patch_inst_crop = cropping_center(patch_inst, [224, 224])
                 patch_class_crop = cropping_center(patch_class, [224, 224])
                 nuclei_counts_perclass = []
+
                 # get the counts per class
                 for nuc_val in range(1, 7):
                     patch_class_crop_tmp = patch_class_crop == nuc_val
@@ -248,13 +299,14 @@ class ConicData(Dataset):
         nuclei_counts_df.to_csv(out_dir + "counts.csv", index=False)
         patch_names_df.to_csv(out_dir + "patch_info.csv", index=False)
 
+
     def _numpy_to_ome_tiff(self):
-        data_folder = self.workdir + "/histology_segmentation_training/data/patches/"
+        data_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/"
         labels = np.load(data_folder + "labels.npy")
         images = np.load(data_folder + "images.npy")
         segmentations = labels[:, :, :, 0]
         classifications = labels[:, :, :, 1]
-        info = pd.read_csv(self.workdir + "/histology_segmentation_training/data/patches/patch_info.csv")
+        info = pd.read_csv(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/patch_info.csv")
         for ids in range(len(images)):
             image = images[ids]
             classification = classifications[ids]
@@ -265,11 +317,14 @@ class ConicData(Dataset):
             full_image[:, :, 3] = classification[:, :]
 
             full_image = np.transpose(full_image, (2, 0, 1))
-            with tiff.TiffWriter(os.path.join("../data/OME-TIFFs/", info.iloc[ids, 0] + ".ome.tif"),
+            with tiff.TiffWriter(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/OME-TIFFs/", info.iloc[ids, 0] + ".ome.tif"),
                                  bigtiff=True) as tif_file:
                 tif_file.write(full_image, photometric="rgb")
 
+
+
 class ConicDataModule(pt.LightningDataModule):
+
     def __init__(self, **kwargs):
         super(ConicDataModule, self).__init__()
         self.workdir = os.getcwd()
@@ -280,7 +335,7 @@ class ConicDataModule(pt.LightningDataModule):
         self.val_data_loader = None
         self.test_data_loader = None
         self.args = kwargs
-        img_ids = list(range(0, 4981))
+        img_ids = list(range(0, 4250))
 
         self.train_ids, val_test_ids = train_test_split(img_ids, test_size=0.3, random_state=42)
         self.val_ids, self.test_ids = train_test_split(val_test_ids, test_size=0.5, random_state=42)
@@ -291,9 +346,9 @@ class ConicDataModule(pt.LightningDataModule):
         pass
 
     def setup(self, stage=None):
-        self.df_train = ConicData(self.train_ids, apply_trans=False, download=self.args["download"])
-        self.df_val = ConicData(self.val_ids, apply_trans=False, download=self.args["download"])
-        self.df_test = ConicData(self.test_ids, apply_trans=False, download=self.args["download"])
+        self.df_train = ConicData(self.train_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
+        self.df_val = ConicData(self.val_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
+        self.df_test = ConicData(self.test_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
 
     def train_dataloader(self):
         """
