@@ -139,6 +139,7 @@ histology_segmentation_training/data/download/img_labels.zip
 # outputs
 mlruns/
 out/
+best_models/
 
 # Jetbrains IDE
 mlruns/0/*

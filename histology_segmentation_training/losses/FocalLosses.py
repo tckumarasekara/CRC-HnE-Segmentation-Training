@@ -20,6 +20,7 @@ class FocalLoss(nn.Module):
 
     def __init__(self, apply_nonlin=None, alpha=None, gamma=2, balance_index=0, smooth=1e-5,
                  size_average=True):
+
         super(FocalLoss, self).__init__()
         self.apply_nonlin = apply_nonlin
         self.alpha = alpha
@@ -33,6 +34,7 @@ class FocalLoss(nn.Module):
                 raise ValueError('smooth value should be in [0,1]')
 
     def forward(self, logit, target, current_epoch=0):
+
         if self.apply_nonlin is not None:
             logit = self.apply_nonlin(logit)
         num_class = logit.shape[1]
@@ -68,12 +70,14 @@ class FocalLoss(nn.Module):
 
         one_hot_key = torch.FloatTensor(target.size(0), num_class).zero_()
         one_hot_key = one_hot_key.scatter_(1, idx, 1)
+
         if one_hot_key.device != logit.device:
             one_hot_key = one_hot_key.to(logit.device)
 
         if self.smooth:
             one_hot_key = torch.clamp(
                 one_hot_key, self.smooth/(num_class-1), 1.0 - self.smooth)
+
         pt = (one_hot_key * logit).sum(1) + self.smooth
         logpt = pt.log()
 
@@ -83,11 +87,14 @@ class FocalLoss(nn.Module):
         alpha = torch.squeeze(alpha)
 
         loss = -1 * alpha * torch.pow((1 - pt), gamma) * logpt
+
         if self.size_average:
             loss = loss.mean()
         else:
             loss = loss.sum()
+
         return loss
+
 
 class Cyclical_FocalLoss(nn.Module):
     '''
@@ -121,7 +128,7 @@ class Cyclical_FocalLoss(nn.Module):
         self.targets_classes = torch.zeros_like(inputs).scatter_(1, target.long().unsqueeze(1), 1)
 
         # Cyclical
-#        eta = abs(1 - self.factor*epoch/(self.epochs-1))
+        # eta = abs(1 - self.factor*epoch/(self.epochs-1))
         if self.factor*epoch < self.epochs:
             eta = 1 - self.factor *epoch/(self.epochs-1)
         else:
