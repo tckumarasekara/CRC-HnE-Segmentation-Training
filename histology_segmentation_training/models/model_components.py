@@ -221,6 +221,111 @@ class SegmentationLayer(nn.Module):
         return self.up2(comb) + z
 
 
+#### ===== UnetXt ===== ####
+# These modules are the building blocks for the U-Net architecture with alterations inspired from swin transformer derived from
+# http://arxiv.org/abs/2201.03545 (describes a ResNet block inspired by the swin stransformer)
+# We have adapted the idea to fit U-net architecture
+class UnetXtConv(nn.Module):
+    """
+    UnetXtConv is a convolution block with 1 depthwise convolution layer and 2 1x1 convolutionchannel-mixing layers
+    seperated by GELU. Additionally, redidual connections are added at the end of the block adopting ResNet style
+    from the paper.
+
+    in_size: channel dimension of input and output
+    ks: kernel size normally 7
+    stride: stride of convolution, should stay 1
+    padding: padding of convolution, needs to be 3 to keep dimensions
+    gpus: whether gpus are used for implementation. Currently only on Linux!
+    """
+
+    def __init__(self, in_size: int, ks=7, stride=1, padding=3, gpus=False):
+        super(UnetXtConv, self).__init__()
+        self.ks = ks
+        self.stride = stride
+        self.padding = padding
+
+        self.block = nn.Sequential(nn.Sequential(
+            nn.Conv2d(in_size, in_size, ks, padding=padding, stride=stride, groups=in_size), # depthwise convolution
+            nn.GroupNorm(1, in_size), # layerNorm
+            nn.Conv2d(in_size, 4*in_size, 1, padding=0, stride=1),
+            nn.GELU(),
+            nn.Conv2d(4*in_size, in_size, 1, padding=0, stride=1),
+        ))
+
+        if gpus:
+            self.block.cuda()
+
+    def forward(self, inputs):
+        x = self.block(inputs)
+        y = x + inputs
+        return y
+
+
+class UnetXtUp(nn.Module):
+    """
+    UnetXtUp is a upsampling layer with a 1x1 Convolution and a prepended dropout layer
+
+    in_size: channel dimension of input
+    out_size: channel dimension of output
+    gpus: whether gpus are used for implementation. Currently only on Linux!
+    """
+
+    def __init__(self, in_size: int, out_size: int, gpus: bool = False, is_third: bool =False):
+        super(UnetXtUp, self).__init__()
+
+        if is_third:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_size, out_size, 1),
+                self.UnetXtConv(out_size),
+                self.UnetXtConv(out_size),
+                self.UnetXtConv(out_size)
+            )
+        else:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_size, out_size, 1),
+                self.UnetXtConv(out_size)
+            )
+
+        self.up = nn.Sequential(
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.Conv2d(in_size, out_size, 1)
+        )
+
+        if gpus:
+            self.conv.cuda()
+            self.up.cuda()
+
+    def forward(self, high_feature, *low_feature):
+        outputs0 = self.up(high_feature)
+        for feature in low_feature:
+            outputs0 = torch.cat([outputs0, feature], dim=1)
+        return self.conv(outputs0)
+
+
+class UnetXtDown(nn.Module):
+    """
+    UnetXtDown is a downsampling layer with a 2x2 Convolution with stride 2
+
+    in_size: channel dimension of input
+    out_size: channel dimension of output
+    gpus: whether gpus are used for implementation. Currently only on Linux!
+    """
+
+    def __init__(self, in_size: int, out_size: int, gpus: bool = False):
+        super(UnetXtDown, self).__init__()
+
+        self.down = nn.Sequential(
+            nn.GroupNorm(1, in_size),
+            nn.Conv2d(in_size, out_size, kernel_size=2, stride=2)
+        )
+
+        if gpus:
+            self.down.cuda()
+
+    def forward(self, inputs):
+        return self.down(inputs)
+
+
 #### ==== Spatial Transformer U-Net ==== ####
 # This module does not work as intended
 class SPTnet(nn.Module):

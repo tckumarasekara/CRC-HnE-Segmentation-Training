@@ -1,6 +1,7 @@
 import os
 import pathlib
 import shutil
+import torch.nn as nn
 
 import numpy as np
 
@@ -114,3 +115,4 @@ def get_bounding_box(img):
     rmax += 1
     cmax += 1
     return [rmin, rmax, cmin, cmax]
+

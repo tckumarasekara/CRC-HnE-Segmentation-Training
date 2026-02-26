@@ -65,6 +65,92 @@ class Unet(UnetSuper):
     def print(self, args: torch.Tensor) -> None:
         print(args)
 
+
+class UnetXt(UnetSuper):
+    """UnetXt
+
+    U-Net architecture with alterations inspired from swin transformer derived from
+    http://arxiv.org/abs/2201.03545 (describes a ResNet block inspired by the swin stransformer)
+    We have adapted the idea to fit U-net architecture
+    """
+    def __init__(self, hparams, input_channels, on_gpu=False, **kwargs):
+        super().__init__(hparams=hparams, **kwargs)
+        self.in_channels = input_channels
+        self.input = input_channels
+        filters = [16, 32, 64, 128]
+
+        # encoder
+        self.stem = nn.Sequential(
+            nn.Conv2d(self.in_channels, filters[0], kernel_size=3, stride=1, padding=1))
+        self.conv1 = UnetXtConv(filters[0],gpus=on_gpu)
+        self.conv2 = UnetXtConv(filters[1], gpus=on_gpu)
+        self.conv3 = nn.Sequential(
+            UnetXtConv(filters[2], gpus=on_gpu),
+            UnetXtConv(filters[2], gpus=on_gpu),
+            UnetXtConv(filters[2], gpus=on_gpu))
+
+        # downsampling
+        self.down1 = UnetXtDown(filters[0], filters[1], gpus=on_gpu)
+        self.down2 = UnetXtDown(filters[1], filters[2], gpus=on_gpu)
+        self.down3 = UnetXtDown(filters[2], filters[3], gpus=on_gpu)
+
+        # inverted bottleneck
+        self.center = UnetXtConv(filters[3], gpus=on_gpu)
+
+        # upsampling
+        self.up_concat3 = UnetXtUp(filters[3], filters[2], gpus=on_gpu, is_third=True)
+        self.up_concat2 = UnetXtUp(filters[2], filters[1], gpus=on_gpu)
+        self.up_concat1 = UnetXtUp(filters[1], filters[0], gpus=on_gpu)
+
+        # final conv (without any concat)
+        self.final = nn.Sequential(
+            nn.GroupNorm(1, filters[0]),
+            nn.Conv2d(filters[0], kwargs["num_classes"], 1))
+
+        if on_gpu:
+            self.stem.cuda()
+            self.conv1.cuda()
+            self.conv2.cuda()
+            self.conv3.cuda()
+            self.down1.cuda()
+            self.down2.cuda()
+            self.down3.cuda()
+            self.center.cuda()
+            self.up_concat3.cuda()
+            self.up_concat2.cuda()
+            self.up_concat1.cuda()
+            self.final.cuda()
+
+        self.apply(weights_init)
+
+    def forward(self, inputs):
+
+        stem = self.stem(inputs) # 16*256*256
+        conv1 = self.conv1(stem)  # 16*256*256
+        down1 = self.down1(conv1)  # 32*128*128
+
+        conv2 = self.conv2(down1)  # 32*128*128
+        down2 = self.down2(conv2)  # 64*64*64
+
+        conv3 = self.conv3(down2)  # 64*64*64
+        down3 = self.down3(conv3)  # 128*32*32
+
+        center = self.center(down3) # 128*32*32
+
+        up3 = self.up_concat3(center, conv3)  # 64*64*64
+        up2 = self.up_concat2(up3, conv2)  # 32*128*128
+        up1 = self.up_concat1(up2, conv1)  # 16*256*256
+
+        final = self.final(up1)
+        finalize = nn.functional.softmax(final, dim=1)
+
+        return finalize
+
+
+    def print(self, args: torch.Tensor) -> None:
+        print(args)
+
+
 #### ==== model with spatial transformer ==== ####
 class RTUnet(UnetSuper):
     """RTUnet
