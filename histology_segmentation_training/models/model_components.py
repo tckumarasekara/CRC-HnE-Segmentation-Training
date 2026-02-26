@@ -276,14 +276,14 @@ class UnetXtUp(nn.Module):
         if is_third:
             self.conv = nn.Sequential(
                 nn.Conv2d(in_size, out_size, 1),
-                self.UnetXtConv(out_size),
-                self.UnetXtConv(out_size),
-                self.UnetXtConv(out_size)
+                UnetXtConv(out_size),
+                UnetXtConv(out_size),
+                UnetXtConv(out_size)
             )
         else:
             self.conv = nn.Sequential(
                 nn.Conv2d(in_size, out_size, 1),
-                self.UnetXtConv(out_size)
+                UnetXtConv(out_size)
             )
 
         self.up = nn.Sequential(
