@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 import pytorch_lightning as pl
 import torch
 import numpy as np
+import os
 
 from losses.FocalLosses import FocalLoss, Cyclical_FocalLoss
 
@@ -32,6 +33,11 @@ class UnetSuper(pl.LightningModule):
         self.criterion.cuda()
         self._to_console = False
         self._val_outputs = []
+        #self._train_outputs = []
+        self._test_metrics_per_image = []
+        self._test_metrics_per_image.append(["id", "iou_class_0", "iou_class_1", "iou_class_2", "iou_class_3", "iou_class_4",
+                                  "iou_class_5", "iou_class_6", "dice_class_0", "dice_class_1", "dice_class_2", "dice_class_3",
+                                  "dice_class_4", "dice_class_5", "dice_class_6", "mean_iou", "mean_dice"])
 
 
     @staticmethod
@@ -92,7 +98,6 @@ class UnetSuper(pl.LightningModule):
         return loss
 
 
-
     def validation_step(self, test_batch, batch_idx):
         """
         Predicts on the test dataset to compute the current performance of the models.
@@ -106,15 +111,25 @@ class UnetSuper(pl.LightningModule):
         prob_mask = self.forward(x)
 
         loss = self.criterion(prob_mask, y.type(torch.long), self.current_epoch)
+        self.log("val_avg_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
-        iter_iou, iter_count = iou_fnc(torch.argmax(prob_mask, dim=1).float(), y, self.args['num_classes'])
+        preds = torch.argmax(prob_mask, dim=1).float()
+        iter_iou, iter_count = iou_fnc(preds, y, self.args['num_classes'])
+        iter_iou_tensor = torch.tensor(iter_iou, device=self.device)
+
+        for c in range(self.args['num_classes']):
+            self.log(f"val_iou_{c}", iter_iou_tensor[c], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
 
         for i in range(self.args['num_classes']):
             output['val_iou_' + str(i)] = torch.tensor(iter_iou[i])
             output['val_iou_cnt_' + str(i)] = torch.tensor(iter_count[i])
 
         output['val_loss'] = loss
+
         self._val_outputs.append(output)
+
+        #mean_iou = iter_iou_tensor.mean()
+        #self.log("val_mean_iou", mean_iou, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return output
 
@@ -159,7 +174,8 @@ class UnetSuper(pl.LightningModule):
         # log test loss
         self.log("test_avg_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
-        iter_iou, iter_count = iou_fnc(torch.argmax(prob_mask, dim=1).float(), y, self.args['num_classes'])
+        preds = torch.argmax(prob_mask, dim=1)
+        iter_iou, iter_count = iou_fnc(preds, y, self.args['num_classes'])
 
         for i in range(self.args['num_classes']):
             self.log(
@@ -170,7 +186,35 @@ class UnetSuper(pl.LightningModule):
                 sync_dist=True,
             )
 
+        for i in range(x.shape[0]):
+            pred_img = preds[i]  # [H, W]
+            true_img = y[i]      # [H, W]
+
+            # compute perclass IoU
+            iou_per_class, _ = iou_fnc(pred_img, true_img, n_classes=self.args['num_classes'])
+
+            # compute perclass Dice
+            dice_per_class = dice_fnc(pred_img, true_img, n_classes=self.args['num_classes'])
+
+            # log per-image, perclass metrics, and mean metrics
+            row = [f"{batch_idx}_{i}"]
+            row.extend(iou_per_class.tolist())
+            row.extend(dice_per_class.tolist())
+            row.append(np.mean(iou_per_class))
+            row.append(np.mean(dice_per_class))
+            row = np.array(row)
+            self._test_metrics_per_image.append(row)
+
         return loss
+
+
+    def on_test_epoch_end(self):
+        out_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "mlruns", "test_metrics_per_image")
+        os.makedirs(out_dir, exist_ok=True)
+
+        with open (f'{out_dir}/test_metrics_per_image_{self.args["models"]}_lr-{self.args["lr"]}_wd-{self.args["weight_decay"]}_dropout-{self.args["dropout_val"]}_epoch-{self.args["epochs"]}_batchS-{self.args["test_batch_size"]}.csv', 'w') as f:
+            for row in self._test_metrics_per_image:
+                f.write(','.join(map(str, row)) + '\n')
 
 
     def prepare_data(self):
@@ -190,7 +234,7 @@ class UnetSuper(pl.LightningModule):
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.args['lr'])
         self.scheduler = {'scheduler': torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, mode='min', factor=0.1, patience=10, min_lr=1e-6, ),
-            'monitor': 'train_avg_loss', }
+            'monitor': 'val_avg_loss', }
 
         return [self.optimizer], [self.scheduler]
 
@@ -206,13 +250,35 @@ def iou_fnc(pred, target, n_classes=7):
         pred_inds = pred == cls
         target_inds = target == cls
 
-        intersection = (pred_inds[target_inds]).long().sum().cpu().item()
-        union = pred_inds.long().sum().cpu().item() + target_inds.long().sum().cpu().item() - intersection  # .data.cpu()[0] - intersection
+        intersection = (pred_inds & target_inds).sum().float()
+        preds, targets = pred_inds.sum().float(), target_inds.sum().float()
+        union = preds + targets - intersection
 
-        if union == 0:
-            ious.append(0.0)
+        if preds == 0 and targets == 0:
+            ious.append(1.0)
         else:
             count[cls] += 1
             ious.append(float(intersection) / float(max(union, 1)))
 
     return np.array(ious), count
+
+
+def dice_fnc(pred, target, n_classes=7):
+    dices = []
+    pred = pred.view(-1)
+    target = target.view(-1)
+
+    for cls in range(0, n_classes):
+        pred_inds = (pred == cls).float()
+        target_inds = (target == cls).float()
+
+        intersection = (pred_inds * target_inds).sum()
+        preds, targets = pred_inds.sum(), target_inds.sum()
+        union = preds + targets - intersection
+
+        if preds == 0 and targets == 0:
+            dices.append(1.0)
+        else:
+            dices.append(float(2 * intersection) / float(max(union, 1)))
+
+    return np.array(dices)

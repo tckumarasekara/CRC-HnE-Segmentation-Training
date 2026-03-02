@@ -66,8 +66,8 @@ class Unet(UnetSuper):
         print(args)
 
 
-class UnetXt(UnetSuper):
-    """UnetXt
+class UneXt(UnetSuper):
+    """UneXt
 
     U-Net architecture with alterations inspired from swin transformer derived from
     http://arxiv.org/abs/2201.03545 (describes a ResNet block inspired by the swin stransformer)
@@ -82,25 +82,25 @@ class UnetXt(UnetSuper):
         # encoder
         self.stem = nn.Sequential(
             nn.Conv2d(self.in_channels, filters[0], kernel_size=3, stride=1, padding=1))
-        self.conv1 = UnetXtConv(filters[0],gpus=on_gpu)
-        self.conv2 = UnetXtConv(filters[1], gpus=on_gpu)
+        self.conv1 = UneXtConv(filters[0],gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+        self.conv2 = UneXtConv(filters[1], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.conv3 = nn.Sequential(
-            UnetXtConv(filters[2], gpus=on_gpu),
-            UnetXtConv(filters[2], gpus=on_gpu),
-            UnetXtConv(filters[2], gpus=on_gpu))
+            UneXtConv(filters[2], gpus=on_gpu, dropout_val=kwargs["dropout_val"]),
+            UneXtConv(filters[2], gpus=on_gpu, dropout_val=kwargs["dropout_val"]),
+            UneXtConv(filters[2], gpus=on_gpu, dropout_val=kwargs["dropout_val"]))
 
         # downsampling
-        self.down1 = UnetXtDown(filters[0], filters[1], gpus=on_gpu)
-        self.down2 = UnetXtDown(filters[1], filters[2], gpus=on_gpu)
-        self.down3 = UnetXtDown(filters[2], filters[3], gpus=on_gpu)
+        self.down1 = UneXtDown(filters[0], filters[1], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+        self.down2 = UneXtDown(filters[1], filters[2], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+        self.down3 = UneXtDown(filters[2], filters[3], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
 
         # inverted bottleneck
-        self.center = UnetXtConv(filters[3], gpus=on_gpu)
+        self.center = UneXtConv(filters[3], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
 
         # upsampling
-        self.up_concat3 = UnetXtUp(filters[3], filters[2], gpus=on_gpu, is_third=True)
-        self.up_concat2 = UnetXtUp(filters[2], filters[1], gpus=on_gpu)
-        self.up_concat1 = UnetXtUp(filters[1], filters[0], gpus=on_gpu)
+        self.up_concat3 = UneXtUp(filters[3], filters[2], gpus=on_gpu, is_third=True, dropout_val=kwargs["dropout_val"])
+        self.up_concat2 = UneXtUp(filters[2], filters[1], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+        self.up_concat1 = UneXtUp(filters[1], filters[0], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
 
         # final conv (without any concat)
         self.final = nn.Sequential(

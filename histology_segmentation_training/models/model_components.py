@@ -221,13 +221,13 @@ class SegmentationLayer(nn.Module):
         return self.up2(comb) + z
 
 
-#### ===== UnetXt ===== ####
+#### ===== UneXt ===== ####
 # These modules are the building blocks for the U-Net architecture with alterations inspired from swin transformer derived from
 # http://arxiv.org/abs/2201.03545 (describes a ResNet block inspired by the swin stransformer)
 # We have adapted the idea to fit U-net architecture
-class UnetXtConv(nn.Module):
+class UneXtConv(nn.Module):
     """
-    UnetXtConv is a convolution block with 1 depthwise convolution layer and 2 1x1 convolutionchannel-mixing layers
+    UneXtConv is a convolution block with 1 depthwise convolution layer and 2 1x1 convolutionchannel-mixing layers
     seperated by GELU. Additionally, redidual connections are added at the end of the block adopting ResNet style
     from the paper.
 
@@ -238,8 +238,8 @@ class UnetXtConv(nn.Module):
     gpus: whether gpus are used for implementation. Currently only on Linux!
     """
 
-    def __init__(self, in_size: int, ks=7, stride=1, padding=3, gpus=False):
-        super(UnetXtConv, self).__init__()
+    def __init__(self, in_size: int, ks=7, stride=1, padding=3, gpus=False, dropout_val=0.001):
+        super(UneXtConv, self).__init__()
         self.ks = ks
         self.stride = stride
         self.padding = padding
@@ -249,6 +249,7 @@ class UnetXtConv(nn.Module):
             nn.GroupNorm(1, in_size), # layerNorm
             nn.Conv2d(in_size, 4*in_size, 1, padding=0, stride=1),
             nn.GELU(),
+            nn.Dropout(dropout_val),
             nn.Conv2d(4*in_size, in_size, 1, padding=0, stride=1),
         ))
 
@@ -261,32 +262,33 @@ class UnetXtConv(nn.Module):
         return y
 
 
-class UnetXtUp(nn.Module):
+class UneXtUp(nn.Module):
     """
-    UnetXtUp is a upsampling layer with a 1x1 Convolution and a prepended dropout layer
+    UneXtUp is a upsampling layer with a 1x1 Convolution and a prepended dropout layer
 
     in_size: channel dimension of input
     out_size: channel dimension of output
     gpus: whether gpus are used for implementation. Currently only on Linux!
     """
 
-    def __init__(self, in_size: int, out_size: int, gpus: bool = False, is_third: bool =False):
-        super(UnetXtUp, self).__init__()
+    def __init__(self, in_size: int, out_size: int, gpus: bool = False, is_third: bool =False, dropout_val=0.001):
+        super(UneXtUp, self).__init__()
 
         if is_third:
             self.conv = nn.Sequential(
                 nn.Conv2d(in_size, out_size, 1),
-                UnetXtConv(out_size),
-                UnetXtConv(out_size),
-                UnetXtConv(out_size)
+                UneXtConv(out_size, dropout_val=dropout_val),
+                UneXtConv(out_size, dropout_val=dropout_val),
+                UneXtConv(out_size, dropout_val=dropout_val)
             )
         else:
             self.conv = nn.Sequential(
                 nn.Conv2d(in_size, out_size, 1),
-                UnetXtConv(out_size)
+                UneXtConv(out_size, dropout_val=dropout_val)
             )
 
         self.up = nn.Sequential(
+            nn.Dropout(dropout_val),
             nn.UpsamplingNearest2d(scale_factor=2),
             nn.Conv2d(in_size, out_size, 1)
         )
@@ -302,17 +304,17 @@ class UnetXtUp(nn.Module):
         return self.conv(outputs0)
 
 
-class UnetXtDown(nn.Module):
+class UneXtDown(nn.Module):
     """
-    UnetXtDown is a downsampling layer with a 2x2 Convolution with stride 2
+    UneXtDown is a downsampling layer with a 2x2 Convolution with stride 2
 
     in_size: channel dimension of input
     out_size: channel dimension of output
     gpus: whether gpus are used for implementation. Currently only on Linux!
     """
 
-    def __init__(self, in_size: int, out_size: int, gpus: bool = False):
-        super(UnetXtDown, self).__init__()
+    def __init__(self, in_size: int, out_size: int, gpus: bool = False, dropout_val=0.001):
+        super(UneXtDown, self).__init__()
 
         self.down = nn.Sequential(
             nn.GroupNorm(1, in_size),

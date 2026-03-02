@@ -115,15 +115,15 @@ if __name__ == "__main__":
         tensorboard_output_path = f'data/default/version_{trainer.logger.version}'
 
     else:
-        checkpoint_callback = ModelCheckpoint(filename=f'{os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}/mlruns/best', save_top_k=1,
-                                              verbose=True, monitor='val_mean_iou', mode='max')
+        checkpoint_callback = ModelCheckpoint(filename=f'{os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}/mlruns/models/best_{dict_args["models"]}_lr-{dict_args["lr"]}_wd-{dict_args["weight_decay"]}_dropout-{dict_args["dropout_val"]}_epoch-{dict_args["epochs"]}_batchS-{dict_args["training_batch_size"]}',
+                                              save_top_k=1, verbose=True, monitor='val_mean_iou', mode='max')
         if torch.cuda.is_available():
             trainer = pl.Trainer(
                 accelerator="gpu" if torch.cuda.is_available() else "cpu",
                 devices=1,
                 max_epochs=dict_args["epochs"],
                 callbacks=[checkpoint_callback],
-                default_root_dir=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/mlruns",
+                default_root_dir=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/mlruns/models",
                 logger=TensorBoardLogger('out'),
                 log_every_n_steps=dict_args["log_interval"],
                 deterministic=True,
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                 devices=1,
                 max_epochs=dict_args["epochs"],
                 callbacks=[checkpoint_callback],
-                default_root_dir=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/mlruns",
+                default_root_dir=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/mlruns/models",
                 logger=TensorBoardLogger('out'),
                 log_every_n_steps=dict_args["log_interval"],
                 deterministic=True,
