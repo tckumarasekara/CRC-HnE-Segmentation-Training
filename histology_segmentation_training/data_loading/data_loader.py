@@ -91,14 +91,14 @@ class ConicData(Dataset):
             #A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5, border_mode=cv2.BORDER_REFLECT_101),
             A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.3),
             A.GaussNoise(std_range=(0.1, 0.2), p=0.3),
-            A.OneOf([
+            #A.OneOf([
                 # Use ranges for number/size of holes
-                A.CoarseDropout(num_holes_range=(1, 8), hole_height_range=(0.1, 0.25),
-                                hole_width_range=(0.1, 0.25), p=1.0),
+                #A.CoarseDropout(num_holes_range=(1, 8), hole_height_range=(0.1, 0.25),
+                #                hole_width_range=(0.1, 0.25), p=1.0),
                 # Use ratio and unit size range for grid
-                A.GridDropout(ratio=0.5, unit_size_range=(25, 51), p=1.0)
-            ], p=0.3),
-            A.Normalize(mean=(0.5,), std=(0.5,)),
+                #A.GridDropout(ratio=0.5, unit_size_range=(25, 51), p=1.0)
+            #], p=0.3),
+            #A.Normalize(mean=(0.5,), std=(0.5,)),
             ToTensorV2()
         ])
 
@@ -364,7 +364,7 @@ class ConicDataModule(pt.LightningDataModule):
         pass
 
     def setup(self, stage=None):
-        self.df_train = ConicData(self.train_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
+        self.df_train = ConicData(self.train_ids, apply_trans=True, download=self.args["download"], from_source=self.args["from_source"])
         self.df_val = ConicData(self.val_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
         self.df_test = ConicData(self.test_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
 
