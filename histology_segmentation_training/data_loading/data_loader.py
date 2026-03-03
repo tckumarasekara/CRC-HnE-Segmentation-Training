@@ -22,6 +22,8 @@ from sklearn.model_selection import train_test_split
 from skimage.transform import warp, AffineTransform
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 
 
@@ -40,6 +42,7 @@ class ConicData(Dataset):
         self.np_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/"
         self.names = pd.read_csv(self.np_dir + "patch_info.csv")
         self.apply_trans = apply_trans
+        self.transform = self.apply_transformation() if self.apply_trans else None
         #self.count = pd.read_csv(self.np_dir + "counts.csv")
 
         if len(glob.glob(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/OME-TIFFs/*")) < 2:
@@ -80,31 +83,46 @@ class ConicData(Dataset):
         return len(self.imgs)
 
 
-    def apply_transformation(self, img, label):
-        img = np.transpose(img, axes=[1, 2, 0])
-        rot_angle = random.uniform(-1, 1)  # max 2 deg.
-        img = rotate(img, rot_angle, mode='edge')  # angle in deg.
-        label = rotate(label, rot_angle, mode='edge')  # angle in deg.
-        sx = random.uniform(-1, 1)
-        sy = random.uniform(-1, 1)
-        shift_trans = AffineTransform(translation=(sx, sy))
-
-        img = warp(img, shift_trans, mode='edge')
-        label = warp(label, shift_trans, mode='edge')
-        img = np.transpose(img, axes=[2, 0, 1])
-        label = np.clip(np.rint(label), 0, 6)
-        return img, label
+    def apply_transformation(self):
+        return A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            #A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5, border_mode=cv2.BORDER_REFLECT_101),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.3),
+            A.GaussNoise(std_range=(0.1, 0.2), p=0.3),
+            A.OneOf([
+                # Use ranges for number/size of holes
+                A.CoarseDropout(num_holes_range=(1, 8), hole_height_range=(0.1, 0.25),
+                                hole_width_range=(0.1, 0.25), p=1.0),
+                # Use ratio and unit size range for grid
+                A.GridDropout(ratio=0.5, unit_size_range=(25, 51), p=1.0)
+            ], p=0.3),
+            A.Normalize(mean=(0.5,), std=(0.5,)),
+            ToTensorV2()
+        ])
 
 
     def __getitem__(self, index):
         img, target = self.imgs[index], self.labels[index]
-        pair = (img, target)
-        if self.apply_trans is not None:
-            augmented = self.apply_transformation(img, target)
-            img = augmented[0]
-            target = augmented[1].astype('int64').squeeze()
-            img = img.astype('float32')
-            pair = (img, target)
+
+        if img.ndim == 3 and img.shape[0] in [1, 3]:
+            img = np.transpose(img, (1, 2, 0))
+
+        if self.apply_trans:
+            img = img.astype(np.float32)
+            target = target.astype(np.int64)
+            augmented = self.transform(image=img, mask=target)
+            img = augmented['image']
+            mask = augmented['mask']
+        else:
+            img = torch.tensor(img, dtype=torch.float)
+            mask = torch.tensor(target, dtype=torch.long)
+
+        if img.ndim == 3 and img.shape[2] in [1, 3]:
+            img = np.transpose(img, (2, 0, 1))
+
+        pair = (img, mask)
 
         return pair
 
