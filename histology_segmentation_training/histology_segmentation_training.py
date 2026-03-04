@@ -98,7 +98,7 @@ if __name__ == "__main__":
     # check, whether the run is inside a Docker container or not
     if 'MLF_CORE_DOCKER_RUN' in os.environ:
         checkpoint_callback = ModelCheckpoint(filename="seg_training_main/mlruns/ckpt", save_top_k=0, verbose=True,
-                                              monitor='train_mean_iou', mode='min')
+                                              monitor='val_mean_iou', mode='max')
         trainer = pl.Trainer.from_argparse_args(args, checkpoint_callback=checkpoint_callback, default_root_dir='/data',
                                                 logger=TensorBoardLogger('/data'))
         tensorboard_output_path = f'data/default/version_{trainer.logger.version}'

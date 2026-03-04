@@ -88,9 +88,12 @@ class ConicData(Dataset):
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
-            #A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5, border_mode=cv2.BORDER_REFLECT_101),
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.3),
-            A.GaussNoise(std_range=(0.1, 0.2), p=0.3),
+            A.RandomBrightnessContrast(brightness_limit=(-0.1,0.1), contrast_limit=(-0.1, 0.1), p=0.3),
+            A.Affine(scale=(0.8, 1.2), rotate=(-15, 15), p=0.3, border_mode=cv2.BORDER_REFLECT_101),
+            A.OneOf([
+                A.GaussianBlur(blur_limit=(1, 3), p=1.0),
+                A.GaussNoise(std_range=(0.1, 0.5), p=1.0),
+            ], p=0.3),
             #A.OneOf([
                 # Use ranges for number/size of holes
                 #A.CoarseDropout(num_holes_range=(1, 8), hole_height_range=(0.1, 0.25),
@@ -98,7 +101,7 @@ class ConicData(Dataset):
                 # Use ratio and unit size range for grid
                 #A.GridDropout(ratio=0.5, unit_size_range=(25, 51), p=1.0)
             #], p=0.3),
-            #A.Normalize(mean=(0.5,), std=(0.5,)),
+            #A.Normalize(mean=(0.4,), std=(0.4,)),
             ToTensorV2()
         ])
 
@@ -110,10 +113,10 @@ class ConicData(Dataset):
             img = np.transpose(img, (1, 2, 0))
 
         if self.apply_trans:
-            img = img.astype(np.float32)
+            img = img.astype(np.float32)/255.0
             target = target.astype(np.int64)
             augmented = self.transform(image=img, mask=target)
-            img = augmented['image']
+            img = augmented['image']*255.0
             mask = augmented['mask']
         else:
             img = torch.tensor(img, dtype=torch.float)

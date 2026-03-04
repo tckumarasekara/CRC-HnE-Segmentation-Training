@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 import mlflow
 mlflow.set_tracking_uri("sqlite:///mlflow.db")
-mlflow.autolog(True)
+#mlflow.autolog(True)
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
