@@ -254,7 +254,7 @@ def iou_fnc(pred, target, n_classes=7):
         preds, targets = pred_inds.sum().float(), target_inds.sum().float()
         union = preds + targets - intersection
 
-        if preds == 0 and targets == 0:
+        if preds.item() == 0 and targets.item() == 0:
             ious.append(1.0)
         else:
             count[cls] += 1
@@ -274,9 +274,9 @@ def dice_fnc(pred, target, n_classes=7):
 
         intersection = (pred_inds * target_inds).sum()
         preds, targets = pred_inds.sum(), target_inds.sum()
-        union = preds + targets - intersection
+        union = preds + targets
 
-        if preds == 0 and targets == 0:
+        if preds.item() == 0 and targets.item() == 0:
             dices.append(1.0)
         else:
             dices.append(float(2 * intersection) / float(max(union, 1)))
