@@ -17,6 +17,7 @@ import os
 
 from .patch_extractor import PatchExtractor
 from .utils import rm_n_mkdir, recur_find_ext, remap_label, cropping_center
+from .preprocess import *
 from skimage.transform import rotate
 from sklearn.model_selection import train_test_split
 from skimage.transform import warp, AffineTransform
@@ -31,7 +32,7 @@ class ConicData(Dataset):
     workdir = os.getcwd()
 
     def __init__(self, ids: list, download: bool,
-                 from_source: bool = False, from_ome_tiff: bool = True, apply_trans=False):
+                 from_source: bool = False, from_ome_tiff: bool = True, apply_trans=False, color_deconv=False):
         super(ConicData, self).__init__()
 
         self.ids = ids
@@ -42,6 +43,7 @@ class ConicData(Dataset):
         self.np_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data/patches/"
         self.names = pd.read_csv(self.np_dir + "patch_info.csv")
         self.apply_trans = apply_trans
+        self.color_deconv = color_deconv
         self.transform = self.apply_transformation() if self.apply_trans else None
         #self.count = pd.read_csv(self.np_dir + "counts.csv")
 
@@ -69,7 +71,13 @@ class ConicData(Dataset):
                     if num > 6:
                         print(f"Warning: Found unexpected label value {num} in image {name}")
                         continue
-                self.imgs.append(img)
+                if self.color_deconv:
+                    hematoxylin = colour_deconvolusion_preprocessing_HnE(img.transpose(1, 2, 0).astype(np.int64))
+                    hematoxylin = hematoxylin[np.newaxis, :, :]   # shape (1,256,256)
+                    C4img = np.concatenate((img, hematoxylin), axis=0)
+                    self.imgs.append(C4img)
+                else:
+                    self.imgs.append(img)
                 self.labels.append(label)
         else:
             imgs = np.load(self.np_dir + "images.npy")
@@ -109,8 +117,10 @@ class ConicData(Dataset):
     def __getitem__(self, index):
         img, target = self.imgs[index], self.labels[index]
 
-        if img.ndim == 3 and img.shape[0] in [1, 3]:
+        if img.ndim == 3 and img.shape[0] in [1, 3, 4]:
             img = np.transpose(img, (1, 2, 0))
+
+        #print(f"Original image shape: {img.shape}, Original mask shape: {target.shape}")
 
         if self.apply_trans:
             img = img.astype(np.float32)/255.0
@@ -122,7 +132,7 @@ class ConicData(Dataset):
             img = torch.tensor(img, dtype=torch.float)
             mask = torch.tensor(target, dtype=torch.long)
 
-        if img.ndim == 3 and img.shape[2] in [1, 3]:
+        if img.ndim == 3 and img.shape[2] in [1, 3, 4]:
             img = np.transpose(img, (2, 0, 1))
 
         pair = (img, mask)
@@ -367,9 +377,9 @@ class ConicDataModule(pt.LightningDataModule):
         pass
 
     def setup(self, stage=None):
-        self.df_train = ConicData(self.train_ids, apply_trans=True, download=self.args["download"], from_source=self.args["from_source"])
-        self.df_val = ConicData(self.val_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
-        self.df_test = ConicData(self.test_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"])
+        self.df_train = ConicData(self.train_ids, apply_trans=True, download=self.args["download"], from_source=self.args["from_source"], color_deconv=self.args["color_deconv"])
+        self.df_val = ConicData(self.val_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"], color_deconv=self.args["color_deconv"])
+        self.df_test = ConicData(self.test_ids, apply_trans=False, download=self.args["download"], from_source=self.args["from_source"], color_deconv=self.args["color_deconv"])
 
     def train_dataloader(self):
         """

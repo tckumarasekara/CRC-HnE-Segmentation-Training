@@ -8,6 +8,7 @@ mlflow.set_tracking_uri("sqlite:///mlflow.db")
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.strategies import DDPStrategy
 from rich import print
 import torch
 from data_loading.data_loader import ConicDataModule, ConicData
@@ -57,6 +58,18 @@ if __name__ == "__main__":
         default=1,
         help="Training duration"
     )
+    parser.add_argument(
+        '--color-deconv',
+        type=bool,
+        default=False,
+        help="Whether to use the color deconvolution preprocessing for the H&E images and add the hematoxylin channel as a fourth channel to the input of the model"
+    )
+    parser.add_argument(
+        '--filter-sz',
+        type=int,
+        default=16,
+        help="Starting filter size of the model"
+    )
 
     parser = UnetSuper.add_model_specific_args(parent_parser=parser)
 
@@ -92,10 +105,10 @@ if __name__ == "__main__":
     model = models.unet_instance.__getattr__(dict_args["models"])
 
     if torch.cuda.is_available():
-        model = model(hparams=parser.parse_args(), input_channels=3, min_filter=32, on_gpu=True, **dict_args)
+        model = model(hparams=parser.parse_args(), input_channels=4 if dict_args['color_deconv'] else 3, min_filter=dict_args['filter_sz'], on_gpu=True, **dict_args)
         model.cuda()
     else:
-        model = model(hparams=parser.parse_args(), input_channels=3, min_filter=32, on_gpu=False, **dict_args)
+        model = model(hparams=parser.parse_args(), input_channels=4 if dict_args['color_deconv'] else 3, min_filter=dict_args['filter_sz'], on_gpu=False, **dict_args)
     model.log_every_n_steps = dict_args['log_interval']
 
     # check, whether the run is inside a Docker container or not
@@ -120,7 +133,8 @@ if __name__ == "__main__":
         if torch.cuda.is_available():
             trainer = pl.Trainer(
                 accelerator="gpu" if torch.cuda.is_available() else "cpu",
-                devices=1,
+                devices=torch.cuda.device_count(),
+                strategy=DDPStrategy(find_unused_parameters=True) if dict_args["models"] == "swinUNETR" else "ddp",
                 max_epochs=dict_args["epochs"],
                 callbacks=[checkpoint_callback],
                 default_root_dir=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/mlruns/models",

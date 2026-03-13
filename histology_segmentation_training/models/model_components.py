@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from monai.networks.nets.swin_unetr import SwinTransformer
 import numpy as np
 
 
@@ -326,6 +327,34 @@ class UneXtDown(nn.Module):
 
     def forward(self, inputs):
         return self.down(inputs)
+
+
+class SwinUnetrEnc(nn.Module):
+
+    def __init__(self, in_size, embed_dim):
+        super(SwinUnetrEnc, self).__init__()
+
+        self.encoder = SwinTransformer(
+            in_chans=in_size,
+            embed_dim=embed_dim,
+            window_size=(7, 7),
+            patch_size=(4, 4),
+            depths=[2, 2, 2, 2],
+            num_heads=[2, 4, 8, 16],
+            mlp_ratio=4.0,
+            qkv_bias=True,
+            drop_rate=0.0,
+            attn_drop_rate=0.0,
+            drop_path_rate=0.1,
+            norm_layer=nn.LayerNorm,
+            use_checkpoint=False,
+            spatial_dims=2,
+        )
+
+    def forward(self, x):
+        features = self.encoder(x)
+        return features[0], features[1], features[2], features[3]
+
 
 
 #### ==== Spatial Transformer U-Net ==== ####

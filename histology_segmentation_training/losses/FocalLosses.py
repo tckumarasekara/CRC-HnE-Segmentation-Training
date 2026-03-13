@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class FocalLoss(nn.Module):
@@ -92,6 +93,31 @@ class FocalLoss(nn.Module):
             loss = loss.mean()
         else:
             loss = loss.sum()
+
+        return loss
+
+
+class DiceLoss(nn.Module):
+
+    def __init__(self, smooth=1e-5):
+        super(DiceLoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, pred, target):
+
+        B, C, H, W = pred.shape
+
+        target = target.squeeze(1)  # [B,H,W]
+
+        target_onehot = F.one_hot(target, num_classes=C)
+        target_onehot = target_onehot.permute(0,3,1,2).float()
+
+        intersection = (pred * target_onehot).sum(dim=(2,3))
+        union = pred.sum(dim=(2,3)) + target_onehot.sum(dim=(2,3))
+
+        dice = (2 * intersection + self.smooth) / (union + self.smooth)
+
+        loss = 1 - dice.mean()
 
         return loss
 

@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import os
 
-from losses.FocalLosses import FocalLoss, Cyclical_FocalLoss
+from losses.FocalLosses import FocalLoss, Cyclical_FocalLoss, DiceLoss
 
 
 class UnetSuper(pl.LightningModule):
@@ -23,12 +23,15 @@ class UnetSuper(pl.LightningModule):
         if kwargs["flat_weights"]:
             self.weights = [1, 1, 1, 1, 1, 1, 1]
         else:
-            self.weights = [0.001, 1, 1, 1, 1, 1, 1]
+            self.weights = [0.5, 1, 1, 1, 1, 1, 1]
 
         if kwargs["loss"] == "FocalLoss":
             self.criterion = FocalLoss(apply_nonlin=None, alpha=self.weights, gamma=2.0)
         else:
             self.criterion = Cyclical_FocalLoss()
+
+        self.dice_criterion = DiceLoss()
+        self.dice_criterion.cuda()
 
         self.criterion.cuda()
         self._to_console = False
@@ -37,7 +40,7 @@ class UnetSuper(pl.LightningModule):
         self._test_metrics_per_image = []
         self._test_metrics_per_image.append(["id", "iou_class_0", "iou_class_1", "iou_class_2", "iou_class_3", "iou_class_4",
                                   "iou_class_5", "iou_class_6", "dice_class_0", "dice_class_1", "dice_class_2", "dice_class_3",
-                                  "dice_class_4", "dice_class_5", "dice_class_6", "mean_iou", "mean_dice"])
+                                  "dice_class_4", "dice_class_5", "dice_class_6", "mean_iou", "mean_dice", "foreground_iou", "foreground_dice"])
 
 
     @staticmethod
@@ -72,6 +75,9 @@ class UnetSuper(pl.LightningModule):
         :return: output - Initialized cross entropy loss function
         """
         labels = labels.long()
+        #focal_loss = self.criterion(logits, labels)
+        #dice_loss = self.dice_criterion(logits, labels)
+
         return self.criterion(logits, labels)
 
 
@@ -193,6 +199,7 @@ class UnetSuper(pl.LightningModule):
             # compute perclass IoU
             iou_per_class, _ = iou_fnc(pred_img, true_img, n_classes=self.args['num_classes'])
 
+
             # compute perclass Dice
             dice_per_class = dice_fnc(pred_img, true_img, n_classes=self.args['num_classes'])
 
@@ -202,6 +209,8 @@ class UnetSuper(pl.LightningModule):
             row.extend(dice_per_class.tolist())
             row.append(np.mean(iou_per_class))
             row.append(np.mean(dice_per_class))
+            row.append(foreground_iou(pred_img, true_img))
+            row.append(foreground_dice(pred_img, true_img))
             row = np.array(row)
             self._test_metrics_per_image.append(row)
 
@@ -263,6 +272,26 @@ def iou_fnc(pred, target, n_classes=7):
     return np.array(ious), count
 
 
+def foreground_iou(pred, target):
+    pred = pred.view(-1)
+    target = target.view(-1)
+
+    pred_fg = (pred != 0).float()
+    target_fg = (target != 0).float()
+
+    intersection = (pred_fg * target_fg).sum()
+    preds = pred_fg.sum()
+    targets = target_fg.sum()
+    union = preds + targets - intersection
+
+    if preds.item() == 0 and targets.item() == 0:
+        iou = 1.0
+    else:
+        iou = float(intersection) / float(max(union, 1))
+
+    return iou
+
+
 def dice_fnc(pred, target, n_classes=7):
     dices = []
     pred = pred.view(-1)
@@ -274,11 +303,29 @@ def dice_fnc(pred, target, n_classes=7):
 
         intersection = (pred_inds * target_inds).sum()
         preds, targets = pred_inds.sum(), target_inds.sum()
-        union = preds + targets
 
         if preds.item() == 0 and targets.item() == 0:
             dices.append(1.0)
         else:
-            dices.append(float(2 * intersection) / float(max(union, 1)))
+            dices.append(float(2 * intersection) / float(max((preds + targets), 1)))
 
     return np.array(dices)
+
+
+def foreground_dice(pred, target):
+    pred = pred.view(-1)
+    target = target.view(-1)
+
+    pred_fg = (pred != 0).float()
+    target_fg = (target != 0).float()
+
+    intersection = (pred_fg * target_fg).sum()
+    preds = pred_fg.sum()
+    targets = target_fg.sum()
+
+    if preds.item() == 0 and targets.item() == 0:
+        dice = 1.0
+    else:
+        dice = float(2 * intersection) / float(max((preds + targets), 1))
+
+    return dice

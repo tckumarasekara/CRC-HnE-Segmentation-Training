@@ -12,13 +12,13 @@ class Unet(UnetSuper):
     Basic Unet which is used for medical image segmentation and classification
     original paper: https://arxiv.org/pdf/1505.04597
     """
-    def __init__(self, hparams, input_channels, is_deconv=True, is_batchnorm=True, on_gpu=False, **kwargs):
+    def __init__(self, hparams, input_channels, min_filter, is_deconv=False, is_batchnorm=True, on_gpu=False, **kwargs):
         super().__init__(hparams=hparams, **kwargs)
         self.in_channels = input_channels
         self.is_deconv = is_deconv
         self.is_batchnorm = is_batchnorm
         self.input = input_channels
-        filters = [16, 32, 64, 128]
+        filters = [min_filter, min_filter * 2, min_filter * 4, min_filter * 8]
         self.conv1 = UnetConv(self.in_channels, filters[0], is_batchnorm, gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.conv2 = UnetConv(filters[0], filters[1], is_batchnorm, gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.conv3 = UnetConv(filters[1], filters[2], is_batchnorm, gpus=on_gpu, dropout_val=kwargs["dropout_val"])
@@ -73,11 +73,11 @@ class UneXt(UnetSuper):
     http://arxiv.org/abs/2201.03545 (describes a ResNet block inspired by the swin stransformer)
     We have adapted the idea to fit U-net architecture
     """
-    def __init__(self, hparams, input_channels, on_gpu=False, **kwargs):
+    def __init__(self, hparams, input_channels, min_filter, on_gpu=False, **kwargs):
         super().__init__(hparams=hparams, **kwargs)
         self.in_channels = input_channels
         self.input = input_channels
-        filters = [16, 32, 64, 128]
+        filters = [min_filter, min_filter * 2, min_filter * 4, min_filter * 8]
 
         # encoder
         self.stem = nn.Sequential(
@@ -151,6 +151,46 @@ class UneXt(UnetSuper):
         print(args)
 
 
+class swinUNETR(UnetSuper):
+
+    def __init__(self, hparams, input_channels, min_filter, on_gpu=False, **kwargs):
+        super().__init__(hparams=hparams, **kwargs)
+        self.in_channels = input_channels
+        filters = [min_filter, min_filter * 2, min_filter * 4, min_filter * 8]
+
+        self.encoder = SwinUnetrEnc(input_channels, filters[0])
+
+        self.up_concat3 = UnetUp(filters[3], filters[2], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+        self.up_concat2 = UnetUp(filters[2], filters[1], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+        self.up_concat1 = UnetUp(filters[1], filters[0], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+
+        self.final = nn.Sequential(
+            nn.Conv2d(filters[0], kwargs["num_classes"], kernel_size=1),
+            nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)  # upsample to match 256x256
+        )
+
+        if on_gpu:
+            self.encoder.cuda()
+            self.up_concat3.cuda()
+            self.up_concat2.cuda()
+            self.up_concat1.cuda()
+            self.final.cuda()
+
+        self.apply(weights_init)
+
+    def forward(self, inputs):
+        enc1, enc2, enc3, enc4 = self.encoder(inputs)
+
+        up3 = self.up_concat3(enc4, enc3)  # 64*64*64
+        up2 = self.up_concat2(up3, enc2)  # 32*128*128
+        up1 = self.up_concat1(up2, enc1)  # 16*256*256
+
+        final = self.final(up1)
+        finalize = nn.functional.softmax(final, dim=1)
+
+        return finalize
+
+
 #### ==== model with spatial transformer ==== ####
 class RTUnet(UnetSuper):
     """RTUnet
@@ -158,13 +198,13 @@ class RTUnet(UnetSuper):
     A Unet with a spatial transformer network at the beginning
     Does not produce intended outcome
     """
-    def __init__(self, hparams, input_channels, is_deconv=True, is_batchnorm=True, on_gpu=False, **kwargs):
+    def __init__(self, hparams, input_channels, min_filter, is_deconv=True, is_batchnorm=True, on_gpu=False, **kwargs):
         super().__init__(hparams=hparams, **kwargs)
         self.in_channels = input_channels
         self.is_deconv = is_deconv
         self.is_batchnorm = is_batchnorm
         self.input = input_channels
-        filters = [8, 16, 32, 64]
+        filters = [min_filter, min_filter * 2, min_filter * 4, min_filter * 8]
         self.head1 = multiHeadBlock(2, input_channels, 1,  gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.fwd1 = forwardProcessingBlock(input_channels,  gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.conv1 = UnetConv(input_channels, filters[0], is_batchnorm=True, gpus=on_gpu, dropout_val=kwargs[
