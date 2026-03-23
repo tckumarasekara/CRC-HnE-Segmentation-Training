@@ -137,7 +137,11 @@ histology_segmentation_training/data/download/img2.zip
 histology_segmentation_training/data/download/img_labels.zip
 
 # outputs
-mlruns/
+mlruns/models/
+mlruns/test_metrics_per_image/
+mlruns/0/
+mlruns/.trash/
+mlruns/best*
 out/
 best_models/
 histology_segmentation_training/results/

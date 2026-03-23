@@ -1,0 +1,17 @@
+download: false
+dropout_val: 0.015
+epochs: 250
+epsilon: 1.0e-16
+flat_weights: false
+from_source: false
+gamma_factor: 2.0
+general_seed: 0
+log_interval: 100
+loss: FocalLoss
+lr: 0.003
+models: UneXt
+num_workers: 4
+pytorch_seed: 0
+test_batch_size: 16
+training_batch_size: 32
+weight_decay: 1.0e-05
