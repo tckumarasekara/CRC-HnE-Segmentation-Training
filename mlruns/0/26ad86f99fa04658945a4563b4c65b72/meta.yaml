@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/26ad86f99fa04658945a4563b4c65b72/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 26ad86f99fa04658945a4563b4c65b72
+run_name: respected-crow-196
+run_uuid: 26ad86f99fa04658945a4563b4c65b72
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678545502462
+status: 1
+tags: []
+user_id: dominikmolitor

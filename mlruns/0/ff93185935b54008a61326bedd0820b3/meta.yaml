@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/ff93185935b54008a61326bedd0820b3/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: ff93185935b54008a61326bedd0820b3
+run_name: monumental-stork-222
+run_uuid: ff93185935b54008a61326bedd0820b3
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678222963503
+status: 1
+tags: []
+user_id: dominikmolitor

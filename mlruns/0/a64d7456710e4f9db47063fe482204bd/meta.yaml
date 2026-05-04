@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/a64d7456710e4f9db47063fe482204bd/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: a64d7456710e4f9db47063fe482204bd
+run_name: gregarious-doe-715
+run_uuid: a64d7456710e4f9db47063fe482204bd
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678394960904
+status: 1
+tags: []
+user_id: dominikmolitor

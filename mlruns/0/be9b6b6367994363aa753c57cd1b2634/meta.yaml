@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/be9b6b6367994363aa753c57cd1b2634/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: be9b6b6367994363aa753c57cd1b2634
+run_name: puzzled-fish-511
+run_uuid: be9b6b6367994363aa753c57cd1b2634
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678395255548
+status: 1
+tags: []
+user_id: dominikmolitor

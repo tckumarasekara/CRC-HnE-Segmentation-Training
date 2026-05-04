@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/b746a5d29ee64e1d8f5cce32ad6b6dfc/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: b746a5d29ee64e1d8f5cce32ad6b6dfc
+run_name: persistent-mouse-124
+run_uuid: b746a5d29ee64e1d8f5cce32ad6b6dfc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678487923963
+status: 1
+tags: []
+user_id: dominikmolitor

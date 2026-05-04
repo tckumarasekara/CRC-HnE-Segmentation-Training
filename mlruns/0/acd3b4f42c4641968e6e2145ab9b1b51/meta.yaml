@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/acd3b4f42c4641968e6e2145ab9b1b51/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: acd3b4f42c4641968e6e2145ab9b1b51
+run_name: upset-bat-14
+run_uuid: acd3b4f42c4641968e6e2145ab9b1b51
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678545116062
+status: 1
+tags: []
+user_id: dominikmolitor

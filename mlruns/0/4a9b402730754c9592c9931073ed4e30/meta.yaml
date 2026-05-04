@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/4a9b402730754c9592c9931073ed4e30/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 4a9b402730754c9592c9931073ed4e30
+run_name: languid-worm-66
+run_uuid: 4a9b402730754c9592c9931073ed4e30
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678545480435
+status: 1
+tags: []
+user_id: dominikmolitor

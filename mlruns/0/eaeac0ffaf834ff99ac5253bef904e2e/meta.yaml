@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/eaeac0ffaf834ff99ac5253bef904e2e/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: eaeac0ffaf834ff99ac5253bef904e2e
+run_name: fearless-stoat-245
+run_uuid: eaeac0ffaf834ff99ac5253bef904e2e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678394975659
+status: 1
+tags: []
+user_id: dominikmolitor

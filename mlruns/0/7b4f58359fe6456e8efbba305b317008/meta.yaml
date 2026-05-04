@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/7b4f58359fe6456e8efbba305b317008/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 7b4f58359fe6456e8efbba305b317008
+run_name: merciful-moose-196
+run_uuid: 7b4f58359fe6456e8efbba305b317008
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678223580011
+status: 1
+tags: []
+user_id: dominikmolitor

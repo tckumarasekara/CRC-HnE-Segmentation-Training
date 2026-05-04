@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/dominikmolitor/PycharmProjects/histology_segmentation_training/mlruns/0/e3e66c77afd8449fbc2a51b57d2cb508/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: e3e66c77afd8449fbc2a51b57d2cb508
+run_name: crawling-duck-260
+run_uuid: e3e66c77afd8449fbc2a51b57d2cb508
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1678544401448
+status: 1
+tags: []
+user_id: dominikmolitor
