@@ -160,6 +160,8 @@ class swinUNETR(UnetSuper):
 
         self.encoder = SwinUnetrEnc(input_channels, filters[0])
 
+        self.center = UnetConv(filters[3], filters[3], is_batchnorm=True, gpus=on_gpu, dropout_val=kwargs["dropout_val"])
+
         self.up_concat3 = UnetUp(filters[3], filters[2], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.up_concat2 = UnetUp(filters[2], filters[1], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
         self.up_concat1 = UnetUp(filters[1], filters[0], gpus=on_gpu, dropout_val=kwargs["dropout_val"])
@@ -171,6 +173,7 @@ class swinUNETR(UnetSuper):
 
         if on_gpu:
             self.encoder.cuda()
+            self.center.cuda()
             self.up_concat3.cuda()
             self.up_concat2.cuda()
             self.up_concat1.cuda()
@@ -181,7 +184,9 @@ class swinUNETR(UnetSuper):
     def forward(self, inputs):
         enc1, enc2, enc3, enc4 = self.encoder(inputs)
 
-        up3 = self.up_concat3(enc4, enc3)  # 64*64*64
+        center = self.center(enc4)
+
+        up3 = self.up_concat3(center, enc3)  # 64*64*64
         up2 = self.up_concat2(up3, enc2)  # 32*128*128
         up1 = self.up_concat1(up2, enc1)  # 16*256*256
 
